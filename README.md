@@ -1,4 +1,4 @@
-Bunch of auxiliary cli tools written in Go
+Collection of auxiliary command line tools
 ===
 
 ### Install 
