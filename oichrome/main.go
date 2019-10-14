@@ -43,6 +43,7 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+
 	var args []string
 	rawArgs := os.Args[1:]
 	sort.Sort(sort.StringSlice(rawArgs))

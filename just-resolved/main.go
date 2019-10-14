@@ -14,6 +14,8 @@ func main() {
 	// resolve bunch of domains to IP
 	var concurrency int
 	flag.IntVar(&concurrency, "c", 20, "Set the concurrency level")
+	var getDomain bool
+	flag.BoolVar(&getDomain, "d", false, "Verbose output")
 	flag.Parse()
 
 	var wg sync.WaitGroup
@@ -26,9 +28,14 @@ func main() {
 			defer wg.Done()
 			for job := range jobs {
 				// really resolved it here
-				// if resolved, err := net.LookupHost(job); err == nil {
 				if resolved, err := net.LookupHost(job); err == nil {
-					output <- resolved[0]
+					if getDomain {
+						record := job + "," + resolved[0]
+						output <- record
+					} else {
+						output <- resolved[0]
+
+					}
 				}
 			}
 		}()
@@ -36,10 +43,10 @@ func main() {
 
 	seen := make(map[string]bool)
 	go func() {
-		for ip := range output {
-			if _, ok := seen[ip]; !ok {
-				seen[ip] = true
-				fmt.Println(ip)
+		for record := range output {
+			if _, ok := seen[record]; !ok {
+				seen[record] = true
+				fmt.Println(record)
 			} else {
 				continue
 			}
