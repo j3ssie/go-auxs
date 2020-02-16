@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 // Sort list of domain but by alexa rank
@@ -29,42 +28,24 @@ func main() {
 	flag.Parse()
 
 	data := make(map[int]string)
-	var wg sync.WaitGroup
-	jobs := make(chan string, concurrency)
-
-	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for job := range jobs {
-				hostname := getHostName(job, "")
-				if hostname != "" {
-					rank, err := getAlexaRank(hostname)
-					if err != nil {
-						continue
-					}
-					_, exist := data[rank]
-					if exist {
-						data[rank] += ";" + hostname
-					} else {
-						data[rank] = hostname
-					}
-				}
-			}
-		}()
-	}
-
 	sc := bufio.NewScanner(os.Stdin)
-	go func() {
-		for sc.Scan() {
-			url := strings.TrimSpace(sc.Text())
-			if err := sc.Err(); err == nil && url != "" {
-				jobs <- url
+	for sc.Scan() {
+		job := strings.TrimSpace(sc.Text())
+
+		hostname := getHostName(job, "")
+		if hostname != "" {
+			rank, err := getAlexaRank(hostname)
+			if err != nil {
+				continue
+			}
+			_, exist := data[rank]
+			if exist {
+				data[rank] += ";" + hostname
+			} else {
+				data[rank] = hostname
 			}
 		}
-		close(jobs)
-	}()
-	wg.Wait()
+	}
 	doSort(data)
 }
 
@@ -129,7 +110,6 @@ func getAlexaRank(url string) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-
 	defer resp.Body.Close()
 
 	alexaData, err := ioutil.ReadAll(resp.Body)
