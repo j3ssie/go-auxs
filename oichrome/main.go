@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/chromedp/chromedp"
 )
@@ -16,11 +17,13 @@ import (
 // Open URL with chromium with your browser session
 var verbose bool
 var concurrency int
+var timeout int
 
 func main() {
 	// cli aguments
 	flag.BoolVar(&verbose, "v", false, "Verbose output")
 	flag.IntVar(&concurrency, "c", 3, "concurrency ")
+	flag.IntVar(&timeout, "t", 10, "timeout ")
 	// custom help
 	flag.Usage = func() {
 		usage()
@@ -53,34 +56,36 @@ func main() {
 
 }
 
-func openWithChrome(url string) {
+// SendWithChrome send request with real browser
+func openWithChrome(url string) error {
+	// show the chrome page in debug mode
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", false),
+		chromedp.Flag("ignore-certificate-errors", true),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("enable-automation", true),
 		chromedp.Flag("disable-extensions", false),
+		chromedp.Flag("disable-setuid-sandbox", true),
 	)
 
-	allocCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
-
-	// create context
-	ctx, _ := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
-	// defer cancel()
-
-	// navigate to a page, wait for an element, click
-	// var example string
-	var res string
-
-	err := chromedp.Run(ctx,
+	allocCtx, bcancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	allocCtx, bcancel = context.WithTimeout(allocCtx, time.Duration(timeout)*time.Second)
+	defer bcancel()
+	chromeContext, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	defer cancel()
+	// start Chrome and run given tasks
+	err := chromedp.Run(
+		chromeContext,
 		chromedp.Navigate(url),
-		// wait for footer element is visible (ie, page is loaded)
-		chromedp.WaitVisible(`div > footer`),
+		// wait for the page to load
+		chromedp.Sleep(time.Duration(timeout)*time.Second),
+
 	)
-	fmt.Println(res)
 	if err != nil {
-		fmt.Println("something wrong")
-		log.Fatal(err)
+		return err
 	}
+
+	return nil
 }
 
 func usage() {
