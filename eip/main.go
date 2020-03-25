@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/c-robinson/iplib"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/c-robinson/iplib"
 )
 
 // Extend the IP range by CIDR
@@ -18,7 +19,7 @@ var sub int
 func main() {
 	// cli arguments
 	flag.IntVar(&concurrency, "c", 3, "concurrency ")
-	flag.IntVar(&sub, "-s", 32, "CIDR subnet (e.g: 24, 22)")
+	flag.IntVar(&sub, "s", 32, "CIDR subnet (e.g: 24, 22)")
 
 	// custom help
 	flag.Usage = func() {
@@ -41,11 +42,11 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-			defer wg.Done()
-			for job := range jobs {
-				extendRange(job, sub)
-			}
-		}()
+		defer wg.Done()
+		for job := range jobs {
+			extendRange(job, sub)
+		}
+	}()
 
 	sc := bufio.NewScanner(os.Stdin)
 	go func() {
@@ -60,7 +61,7 @@ func main() {
 }
 
 func extendRange(rangeIP string, sub int) {
-	 _, ipna, err := iplib.ParseCIDR(rangeIP)
+	_, ipna, err := iplib.ParseCIDR(rangeIP)
 	if err != nil {
 		return
 	}
@@ -69,7 +70,10 @@ func extendRange(rangeIP string, sub int) {
 		return
 	}
 	for _, item := range extendedIPs {
-		ip := item.IP.String()
+		ip := item.String()
+		if sub == 32 {
+			ip = item.IP.String()
+		}
 		fmt.Println(ip)
 	}
 
