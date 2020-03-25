@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -30,16 +31,6 @@ func main() {
 	var wg sync.WaitGroup
 	jobs := make(chan string, concurrency)
 
-	//for i := 0; i < concurrency; i++ {
-	//	wg.Add(1)
-	//	go func() {
-	//		defer wg.Done()
-	//		for job := range jobs {
-	//			openWithChrome(job)
-	//		}
-	//	}()
-	//}
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -63,6 +54,10 @@ func main() {
 func extendRange(rangeIP string, sub int) {
 	_, ipna, err := iplib.ParseCIDR(rangeIP)
 	if err != nil {
+		ip := net.ParseIP(rangeIP)
+		if ip != nil {
+			fmt.Println(ip)
+		}
 		return
 	}
 	extendedIPs, err := ipna.Subnet(sub)
