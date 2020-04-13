@@ -7,8 +7,6 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
-	"github.com/mitchellh/go-homedir"
-	"github.com/ovh/cds/sdk/log"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -16,6 +14,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/mitchellh/go-homedir"
 )
 
 type Items struct {
@@ -81,7 +81,7 @@ func main() {
 	}
 	content := GetFileContent(burpFile)
 	if content == "" {
-		log.Fatalf("failed to read content of %s", burpFile)
+		fmt.Printf("failed to read content of %v \n", burpFile)
 		return
 	}
 
@@ -89,7 +89,7 @@ func main() {
 	r := &Items{}
 	err := xml.Unmarshal([]byte(content), r)
 	if err != nil {
-		log.Fatalf("failed to parse Burp XML file: %s", err)
+		fmt.Printf("failed to parse Burp XML file: %v \n", err)
 		return
 	}
 
@@ -143,7 +143,7 @@ func main() {
 	// write to CSV
 	csvFile, err := os.Create(output)
 	if err != nil {
-		log.Fatalf("failed to write csv data: %s", err)
+		fmt.Printf("failed to write csv data: %s \n", err)
 		return
 	}
 	csvWriter := csv.NewWriter(csvFile)
