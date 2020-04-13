@@ -52,11 +52,12 @@ type Items struct {
 }
 
 var (
-	burpFile string
-	output   string
-	isBase64 bool
-	noBody   bool
-	flat     bool
+	burpFile   string
+	output     string
+	isBase64   bool
+	noBody     bool
+	flat       bool
+	stripComma bool
 )
 
 // Usage:
@@ -71,6 +72,7 @@ func main() {
 	flag.BoolVar(&noBody, "n", false, "Don't store body in csv output")
 	flag.BoolVar(&isBase64, "b", true, "is Burp XML base64 encoded")
 	flag.BoolVar(&flat, "f", false, "Store raw request base64 line by line")
+	flag.BoolVar(&stripComma, "s", true, "Encode ',' in case it appear in data")
 	flag.Parse()
 	args := os.Args[1:]
 	sort.Strings(args)
@@ -111,6 +113,15 @@ func main() {
 			fmt.Println(item.Request.Text)
 			continue
 		}
+		if stripComma {
+			if strings.Contains(item.URL, ",") {
+				item.URL = strings.Replace(item.URL, ",", "%2c", -1)
+			}
+			if strings.Contains(item.Path, ",") {
+				item.Path = strings.Replace(item.Path, ",", "%2c", -1)
+			}
+		}
+
 		dest := fmt.Sprintf("%v:%v", item.Host.Ip, item.Port)
 		data := []string{
 			item.URL, item.Method, item.Host.Text, item.Path, item.Protocol, dest, item.Status, item.Responselength,
