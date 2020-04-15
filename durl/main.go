@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 )
 
 // diff URLs
 // Strip out similar URLs by unique hostname-path-paramName
-
 
 func main() {
 	data := make(map[string]string)
@@ -40,12 +40,13 @@ func hashUrl(raw string) string {
 		return ""
 	}
 
-	var queries string
+	var queries []string
 	for k := range u.Query() {
-		queries += fmt.Sprintf("%v", k)
+		queries = append(queries, k)
 	}
-
-	data := fmt.Sprintf("%v-%v-%v", u.Hostname(), u.Path, queries)
+	sort.Strings(queries)
+	query := strings.Join(queries, "-")
+	data := fmt.Sprintf("%v-%v-%v", u.Hostname(), u.Path, query)
 	return genHash(data)
 }
 
@@ -54,5 +55,5 @@ func genHash(text string) string {
 	h := sha1.New()
 	h.Write([]byte(text))
 	hashed := h.Sum(nil)
-	return fmt.Sprintf("%x", hashed)
+	return fmt.Sprintf("%v", hashed)
 }
