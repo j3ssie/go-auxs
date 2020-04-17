@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -96,13 +95,8 @@ func main() {
 }
 
 func doScreenshot(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return ""
-	}
-	imageDir := path.Join(output, u.Hostname())
-	os.MkdirAll(imageDir, 0750)
-	imageScreen := path.Join(imageDir, fmt.Sprintf("%v.png", strings.Replace(raw, "/", "_", -1)))
+	imageName := strings.Replace(raw, "://", "___", -1)
+	imageScreen := path.Join(output, fmt.Sprintf("%v.png", strings.Replace(imageName, "/", "_", -1)))
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
@@ -124,7 +118,7 @@ func doScreenshot(raw string) string {
 
 	// capture screenshot of an element
 	var buf []byte
-	err = chromedp.Run(ctx, fullScreenshot(raw, QUALITY, &buf))
+	err := chromedp.Run(ctx, fullScreenshot(raw, QUALITY, &buf))
 	// clean chromedp-runner folder
 	cleanUp()
 	if err != nil {
