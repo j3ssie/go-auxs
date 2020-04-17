@@ -3,22 +3,22 @@ package main
 import (
 	"bufio"
 	"encoding/xml"
-	"net/http"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 )
 
-// Extend the IP range by CIDR
+// Get alexa rank of list of urls
 // Usage: echo '1.2.3.4/24' | arank -c 50
 var concurrency int
 
 func main() {
 	// cli arguments
-	flag.IntVar(&concurrency, "c", 30, "concurrency ")
+	flag.IntVar(&concurrency, "c", 30, "concurrency")
 
 	// custom help
 	flag.Usage = func() {
