@@ -56,6 +56,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Can't create output directory")
 	}
+	output, _ = filepath.Abs(output)
 
 	var wg sync.WaitGroup
 	jobs := make(chan string, concurrency)
