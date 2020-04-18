@@ -32,6 +32,7 @@ var (
 	indexFile   string
 	concurrency int
 	verbose     bool
+	absPath     bool
 	timeout     int
 	imgWidth    int
 	imgHeight   int
@@ -43,6 +44,7 @@ func main() {
 	flag.StringVar(&output, "o", "screen", "Output Directory")
 	flag.StringVar(&indexFile, "s", "", "Summary File")
 	flag.BoolVar(&verbose, "v", false, "Verbose output")
+	flag.BoolVar(&absPath, "a", false, "Use Absolute path in summary")
 	flag.IntVar(&timeout, "timeout", 10, "screenshot timeout")
 	flag.IntVar(&imgHeight, "height", 0, "height screenshot")
 	flag.IntVar(&imgWidth, "width", 0, "width screenshot")
@@ -56,7 +58,10 @@ func main() {
 	if err != nil {
 		log.Fatal("Can't create output directory")
 	}
-	output, _ = filepath.Abs(output)
+
+	if absPath {
+		output, _ = filepath.Abs(output)
+	}
 
 	var wg sync.WaitGroup
 	jobs := make(chan string, concurrency)
