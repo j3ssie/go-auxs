@@ -102,10 +102,7 @@ func main() {
 
 func doScreenshot(raw string) string {
 	imageName := strings.Replace(raw, "://", "___", -1)
-	imageScreen := fmt.Sprintf("%v.png", strings.Replace(imageName, "/", "_", -1))
-	if absPath {
-		imageScreen = path.Join(output, fmt.Sprintf("%v.png", strings.Replace(imageName, "/", "_", -1)))
-	}
+	imageScreen := path.Join(output, fmt.Sprintf("%v.png", strings.Replace(imageName, "/", "_", -1)))
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
@@ -139,8 +136,10 @@ func doScreenshot(raw string) string {
 	if err := ioutil.WriteFile(imageScreen, buf, 0644); err != nil {
 		log.Printf("[-] screen err: %v", raw)
 	}
-	return imageScreen
-
+	if absPath {
+		return imageScreen
+	}
+	return path.Base(imageScreen)
 }
 
 // fullScreenshot takes a screenshot of the entire browser viewport.
