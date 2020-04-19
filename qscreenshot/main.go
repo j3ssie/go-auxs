@@ -102,7 +102,10 @@ func main() {
 
 func doScreenshot(raw string) string {
 	imageName := strings.Replace(raw, "://", "___", -1)
-	imageScreen := path.Join(output, fmt.Sprintf("%v.png", strings.Replace(imageName, "/", "_", -1)))
+	imageScreen := fmt.Sprintf("%v.png", strings.Replace(imageName, "/", "_", -1))
+	if absPath {
+		imageScreen = path.Join(output, fmt.Sprintf("%v.png", strings.Replace(imageName, "/", "_", -1)))
+	}
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
