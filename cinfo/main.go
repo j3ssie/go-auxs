@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
 	"encoding/xml"
 	"flag"
 	"fmt"
@@ -97,29 +98,32 @@ func getHostName(raw string, port string) string {
 	return hostname
 }
 
-func getCerts(url string) bool {
+func getCerts(raw string) bool {
 	var certs cert.Certs
 	var err error
 	var rank string
 
 	cert.SkipVerify = true
 
-	certs, err = cert.NewCerts([]string{url})
+	certs, err = cert.NewCerts([]string{raw})
 	if err != nil {
 		return false
 	}
 
 	for _, certItem := range certs {
 		if verbose {
-			fmt.Printf("%s", certs)
-		} else {
-			for _, domain := range certItem.SANs {
-				if alexa {
-					rank, _ = getAlexaRank(domain)
-					fmt.Printf("%v,%v,%s\n", url, domain, rank)
-				} else {
-					fmt.Printf("%v,%v\n", url, domain)
-				}
+			info, err := GetCertificatesInfo(raw)
+			if err == nil {
+				fmt.Printf("%s - %s\n",raw, info)
+			}
+		}
+
+		for _, domain := range certItem.SANs {
+			if alexa {
+				rank, _ = getAlexaRank(domain)
+				fmt.Printf("%v,%v,%s\n", raw, domain, rank)
+			} else {
+				fmt.Printf("%v,%v\n", raw, domain)
 			}
 		}
 	}
@@ -127,10 +131,10 @@ func getCerts(url string) bool {
 
 }
 
-func getAlexaRank(url string) (string, error) {
+func getAlexaRank(raw string) (string, error) {
 	rank := "-1"
 
-	resp, err := http.Get("http://data.alexa.com/data?cli=10&dat=snbamz&url=" + url)
+	resp, err := http.Get("http://data.alexa.com/data?cli=10&dat=snbamz&url=" + raw)
 	if err != nil {
 		return rank, err
 	}
@@ -159,4 +163,15 @@ func getAlexaRank(url string) (string, error) {
 		}
 	}
 	return rank, nil
+}
+
+func GetCertificatesInfo(address string) (string, error) {
+	conn, err := tls.Dial("tcp", address, &tls.Config{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+	return fmt.Sprintf("%v", conn.ConnectionState().PeerCertificates[0].Subject), nil
 }
