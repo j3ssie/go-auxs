@@ -121,7 +121,7 @@ func genPorts(port string) []string {
 	case "f":
 		var ports []string
 		for i := 1; i <= 65535; i++ {
-			ports = append(ports, fmt.Sprintf("%s", i))
+			ports = append(ports, fmt.Sprintf("%d", i))
 		}
 		return ports
 	default:
