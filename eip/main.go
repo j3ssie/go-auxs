@@ -28,11 +28,6 @@ func main() {
 	flag.IntVar(&concurrency, "c", 3, "concurrency ")
 	flag.IntVar(&sub, "s", 32, "CIDR subnet (e.g: 24, 22)")
 	flag.StringVar(&port, "p", "", "Append port after each IP (some predefined value: full, xlarge, large, small or f,x,l,s)")
-
-	// custom help
-	flag.Usage = func() {
-		os.Exit(1)
-	}
 	flag.Parse()
 
 	if port != "" {
