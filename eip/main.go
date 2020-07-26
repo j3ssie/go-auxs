@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/c-robinson/iplib"
 )
@@ -17,15 +16,15 @@ import (
 // Usage: echo '1.2.3.4/24' | eip -p small
 
 var (
-	concurrency int
-	sub         int
-	port        string
-	ports       []string
+	unique bool
+	sub    int
+	port   string
+	ports  []string
 )
 
 func main() {
 	// cli arguments
-	flag.IntVar(&concurrency, "c", 3, "concurrency ")
+	flag.BoolVar(&unique, "u", true, "unique result")
 	flag.IntVar(&sub, "s", 32, "CIDR subnet (e.g: 24, 22)")
 	flag.StringVar(&port, "p", "", "Append port after each IP (some predefined value: full, xlarge, large, small or f,x,l,s)")
 	flag.Parse()
@@ -34,30 +33,32 @@ func main() {
 		ports = genPorts(port)
 	}
 
-	var wg sync.WaitGroup
-	jobs := make(chan string, concurrency)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for job := range jobs {
-			extendRange(job, sub)
-		}
-	}()
-
+	var result []string
 	sc := bufio.NewScanner(os.Stdin)
-	go func() {
-		for sc.Scan() {
-			url := strings.TrimSpace(sc.Text())
-			jobs <- url
+	for sc.Scan() {
+		job := strings.TrimSpace(sc.Text())
+		data := extendRange(job, sub)
+		if len(data) > 0 {
+			result = append(result, data...)
 		}
-		close(jobs)
-	}()
-	wg.Wait()
+	}
 
+	if !unique {
+		fmt.Println(strings.Join(result, "\n"))
+		return
+	}
+
+	unique := make(map[string]bool)
+	for _, v := range result {
+		if !unique[v] {
+			unique[v] = true
+			fmt.Println(v)
+		}
+	}
 }
 
-func extendRange(rangeIP string, sub int) {
+func extendRange(rangeIP string, sub int) []string {
+	var result []string
 	_, ipna, err := iplib.ParseCIDR(rangeIP)
 	if err != nil {
 		ip := net.ParseIP(rangeIP)
@@ -70,11 +71,11 @@ func extendRange(rangeIP string, sub int) {
 				}
 			}
 		}
-		return
+		return result
 	}
 	extendedIPs, err := ipna.Subnet(sub)
 	if err != nil {
-		return
+		return result
 	}
 	for _, item := range extendedIPs {
 		ip := item.String()
@@ -82,13 +83,15 @@ func extendRange(rangeIP string, sub int) {
 			ip = item.IP.String()
 		}
 		if port == "" || sub != 32 {
-			fmt.Println(ip)
+			result = append(result, ip)
 		} else {
 			for _, p := range ports {
-				fmt.Printf("%s:%s\n", ip, p)
+				ip = fmt.Sprintf("%s:%s", ip, p)
+				result = append(result, ip)
 			}
 		}
 	}
+	return result
 }
 
 func genPorts(port string) []string {
@@ -122,5 +125,4 @@ func genPorts(port string) []string {
 	default:
 		return []string{"80", "443", "8000", "8080", "8443"}
 	}
-
 }
