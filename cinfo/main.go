@@ -22,6 +22,8 @@ import (
 var (
 	verbose bool
 	alexa   bool
+	extra   bool
+	ports   string
 )
 
 func main() {
@@ -29,6 +31,8 @@ func main() {
 	var concurrency int
 	flag.IntVar(&concurrency, "c", 20, "Set the concurrency level")
 	flag.BoolVar(&alexa, "a", false, "Check Alexa Rank of domain")
+	flag.BoolVar(&extra, "e", false, "Append common extra HTTPS port too")
+	flag.StringVar(&ports, "p", "443,8443,9443", "Common extra HTTPS port too (default: 443,8443,9443)")
 	flag.BoolVar(&verbose, "v", false, "Verbose output")
 	flag.Parse()
 
@@ -55,6 +59,15 @@ func main() {
 			for job := range jobs {
 				hostname := getHostName(job, "")
 				if hostname != "" {
+					if extra {
+						if strings.Contains(hostname, ":") {
+							hostname = strings.Split(hostname, ":")[0]
+						}
+						hostnames := moreHosts(hostname)
+						for _, host := range hostnames {
+							getCerts(host)
+						}
+					}
 					if !getCerts(hostname) {
 						getCerts(getHostName(job, "443"))
 					}
@@ -74,6 +87,15 @@ func main() {
 		close(jobs)
 	}()
 	wg.Wait()
+}
+
+func moreHosts(raw string) []string {
+	var result []string
+	mports := strings.Split(raw, ",")
+	for _, mport := range mports {
+		result = append(result, fmt.Sprintf("%s:%s", raw, mport))
+	}
+	return result
 }
 
 func getHostName(raw string, port string) string {
@@ -114,7 +136,7 @@ func getCerts(raw string) bool {
 		if verbose {
 			info, err := GetCertificatesInfo(raw)
 			if err == nil {
-				fmt.Printf("%s - %s\n",raw, info)
+				fmt.Printf("%s - %s\n", raw, info)
 			}
 		}
 
