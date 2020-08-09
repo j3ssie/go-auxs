@@ -11,7 +11,7 @@ Collection of auxiliary command line tools
 | **qscreenshot**   | Do screenshot from list of URLs    |
 | **bparse**        | parsing burp XML file               |
 | **arank**         | Get alexa rank of list of urls      |
-
+| **chrunk**         | Run your command against really really big file.      |
 
 ***
 
