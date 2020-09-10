@@ -26,17 +26,18 @@ var (
 // literally copied from: https://github.com/theblackturtle/ureplace
 
 var (
-	appendMode     bool
-	query          bool
-	path           bool
-	removeMediaExt bool
-	removeLastPath bool
-	place          string
-	blacklistExt   string
-	toInjectList   string
-	injectWords    string
-	InjectAll      bool
-	payloadList    []string
+	appendMode      bool
+	query           bool
+	path            bool
+	removeMediaExt  bool
+	removeLastPath  bool
+	place           string
+	blacklistExt    string
+	toInjectList    string
+	injectWords     string
+	InjectAll       bool
+	RemoveDummyPort bool
+	payloadList     []string
 )
 
 func main() {
@@ -45,6 +46,7 @@ func main() {
 	flag.BoolVar(&query, "q", false, "Query only (default will replace both path and query)")
 	flag.BoolVar(&path, "p", false, "Path only (default will replace both path and query)")
 	flag.BoolVar(&removeLastPath, "pp", true, "Remove last path")
+	flag.BoolVar(&RemoveDummyPort, "ppp", true, "Remove dummy port like :80")
 
 	flag.StringVar(&blacklistExt, "b", "", "Additional blacklist extensions (Ex: js,html)")
 	flag.StringVar(&toInjectList, "f", "", "Payload list")
@@ -85,7 +87,12 @@ func main() {
 
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
-		u, err := url.Parse(strings.TrimSpace(sc.Text()))
+		raw := strings.TrimSpace(sc.Text())
+		if RemoveDummyPort {
+			raw = strings.Replace(raw, ":80/", "/", -1)
+		}
+
+		u, err := url.Parse(raw)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to parse url %s [%s]\n", sc.Text(), err)
 			continue
