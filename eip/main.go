@@ -86,8 +86,8 @@ func extendRange(rangeIP string, sub int) []string {
 			result = append(result, ip)
 		} else {
 			for _, p := range ports {
-				ip = fmt.Sprintf("%s:%s", ip, p)
-				result = append(result, ip)
+				ipWithPort := fmt.Sprintf("%s:%s", ip, p)
+				result = append(result, ipWithPort)
 			}
 		}
 	}

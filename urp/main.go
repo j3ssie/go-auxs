@@ -23,7 +23,7 @@ var (
 	IgnoreExtensions = []string{"png", "apng", "bmp", "gif", "ico", "cur", "jpg", "jpeg", "jfif", "pjp", "pjpeg", "svg", "tif", "tiff", "webp", "xbm", "3gp", "aac", "flac", "mpg", "mpeg", "mp3", "mp4", "m4a", "m4v", "m4p", "oga", "ogg", "ogv", "mov", "wav", "webm", "eot", "woff", "woff2", "ttf", "otf", "css"}
 )
 
-// literally copied from: https://github.com/theblackturtle/ureplace
+// Literally copied from: https://github.com/theblackturtle/ureplace
 
 var (
 	appendMode      bool
@@ -31,6 +31,7 @@ var (
 	path            bool
 	removeMediaExt  bool
 	removeLastPath  bool
+	last            bool
 	place           string
 	blacklistExt    string
 	toInjectList    string
@@ -45,6 +46,7 @@ func main() {
 	flag.BoolVar(&removeMediaExt, "m", false, "Ignore media extensions")
 	flag.BoolVar(&query, "q", false, "Query only (default will replace both path and query)")
 	flag.BoolVar(&path, "p", false, "Path only (default will replace both path and query)")
+	flag.BoolVar(&last, "l", false, "Append payload after the extension")
 	flag.BoolVar(&removeLastPath, "pp", true, "Remove last path")
 	flag.BoolVar(&RemoveDummyPort, "ppp", true, "Remove dummy port like :80")
 
@@ -314,6 +316,22 @@ func PathBuilder(urlString string, payload string) ([]string, error) {
 		uRawPath, _ := url.PathUnescape(u.String())
 		urlList = append(urlList, uRawPath)
 	}
+
+	if last {
+		cloneURL := &url.URL{}
+		err := copier.Copy(cloneURL, u)
+		if err != nil {
+			return []string{}, fmt.Errorf("Failed to clone url")
+		}
+		pathClone := append(paths[:0:0], paths...)
+		cloneURL.Path = strings.Join(pathClone, "/") + payload
+		cloneURLRawPath, _ := url.PathUnescape(cloneURL.String())
+		urlList = append(urlList, cloneURLRawPath)
+		cloneURL.Path = strings.Join(pathClone, "/") +"?"+ payload
+		cloneURLRawPath, _ = url.PathUnescape(cloneURL.String())
+		urlList = append(urlList, cloneURLRawPath)
+	}
+
 	return urlList, nil
 }
 
