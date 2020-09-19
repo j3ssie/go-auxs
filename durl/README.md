@@ -11,4 +11,3 @@ go get -u github.com/j3ssie/go-auxs/durl
 ```
 cat wayback_urls.txt | durl | tee differ_urls.txt
 ```
-

@@ -327,6 +327,7 @@ func PathBuilder(urlString string, payload string) ([]string, error) {
 		cloneURL.Path = strings.Join(pathClone, "/") + payload
 		cloneURLRawPath, _ := url.PathUnescape(cloneURL.String())
 		urlList = append(urlList, cloneURLRawPath)
+
 		cloneURL.Path = strings.Join(pathClone, "/") +"?"+ payload
 		cloneURLRawPath, _ = url.PathUnescape(cloneURL.String())
 		urlList = append(urlList, cloneURLRawPath)
