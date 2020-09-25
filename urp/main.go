@@ -32,6 +32,7 @@ var (
 	removeMediaExt  bool
 	removeLastPath  bool
 	last            bool
+	paramName            bool
 	place           string
 	blacklistExt    string
 	toInjectList    string
@@ -44,7 +45,8 @@ var (
 func main() {
 	flag.BoolVar(&appendMode, "a", false, "Append the value")
 	flag.BoolVar(&removeMediaExt, "m", false, "Ignore media extensions")
-	flag.BoolVar(&query, "q", false, "Query only (default will replace both path and query)")
+	flag.BoolVar(&query, "n", false, "Inject payload to param name too")
+	flag.BoolVar(&paramName, "l", false, "Append payload after the extension")
 	flag.BoolVar(&path, "p", false, "Path only (default will replace both path and query)")
 	flag.BoolVar(&last, "l", false, "Append payload after the extension")
 	flag.BoolVar(&removeLastPath, "pp", true, "Remove last path")
@@ -206,7 +208,6 @@ func QueryBuilder(urlString string, payload string) ([]string, error) {
 		if strings.HasPrefix(place, "-") {
 			p, err := strconv.Atoi(place[1:])
 			if err != nil {
-				// fmt.Fprintf(os.Stderr, "failed to convert \"place\" string to int\n")
 				p = 0
 			}
 			toReplacePlace = len(pp[:len(pp)-p])
