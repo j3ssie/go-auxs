@@ -46,7 +46,6 @@ func main() {
 	flag.BoolVar(&appendMode, "a", false, "Append the value")
 	flag.BoolVar(&removeMediaExt, "m", false, "Ignore media extensions")
 	flag.BoolVar(&query, "n", false, "Inject payload to param name too")
-	flag.BoolVar(&paramName, "l", false, "Append payload after the extension")
 	flag.BoolVar(&path, "p", false, "Path only (default will replace both path and query)")
 	flag.BoolVar(&last, "l", false, "Append payload after the extension")
 	flag.BoolVar(&removeLastPath, "pp", true, "Remove last path")
