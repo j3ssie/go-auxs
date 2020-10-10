@@ -40,6 +40,7 @@ var (
 	injectWords     string
 	InjectAll       bool
 	RemoveQuery     bool
+	TrimLastSlash   bool
 	RemoveDummyPort bool
 	payloadList     []string
 )
@@ -54,6 +55,7 @@ func main() {
 	// remove some path
 	flag.BoolVar(&removeLastPath, "pp", true, "Remove last path")
 	flag.BoolVar(&RemoveDummyPort, "ppp", true, "Remove dummy port like :80")
+	flag.BoolVar(&TrimLastSlash, "ss", false, "Trim Last Slash")
 	flag.BoolVar(&RemoveQuery, "qq", false, "Remove Query String (useful when do dirbscan)")
 
 	flag.StringVar(&blacklistExt, "b", "", "Additional blacklist extensions (Ex: js,html)")
@@ -154,6 +156,9 @@ func main() {
 			}
 
 			for _, gU := range finalUrls {
+				if TrimLastSlash {
+					gU = strings.TrimRight(gU, "/")
+				}
 				fmt.Println(gU)
 			}
 		}

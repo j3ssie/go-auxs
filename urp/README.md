@@ -37,6 +37,13 @@ http://sub.target.com/34032/
 http://sub.target.com/34032/cegetel/
 http://sub.target.com/34032/cegetel/fr-fr/
 
+# Trim last '/' too
+echo 'http://sub.target.com:80/34032/cegetel/fr-fr/index.php?q=123' | urp -I '' -qq -ss
+
+http://sub.target.com
+http://sub.target.com/34032
+http://sub.target.com/34032/cegetel
+http://sub.target.com/34032/cegetel/fr-fr
 
 cat urls.txt | urp -I '' -qq | sort -u
 
