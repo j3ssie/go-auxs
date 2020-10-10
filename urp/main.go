@@ -24,6 +24,7 @@ var (
 )
 
 // Literally copied from: https://github.com/theblackturtle/ureplace
+// with some improvements
 
 var (
 	appendMode      bool
@@ -32,12 +33,13 @@ var (
 	removeMediaExt  bool
 	removeLastPath  bool
 	last            bool
-	paramName            bool
+	paramName       bool
 	place           string
 	blacklistExt    string
 	toInjectList    string
 	injectWords     string
 	InjectAll       bool
+	RemoveQuery     bool
 	RemoveDummyPort bool
 	payloadList     []string
 )
@@ -48,9 +50,11 @@ func main() {
 	flag.BoolVar(&query, "n", false, "Inject payload to param name too")
 	flag.BoolVar(&paramName, "l", false, "Append payload after the extension")
 	flag.BoolVar(&path, "p", false, "Path only (default will replace both path and query)")
-	flag.BoolVar(&last, "l", false, "Append payload after the extension")
+	flag.BoolVar(&last, "L", false, "Append payload after the extension")
+	// remove some path
 	flag.BoolVar(&removeLastPath, "pp", true, "Remove last path")
 	flag.BoolVar(&RemoveDummyPort, "ppp", true, "Remove dummy port like :80")
+	flag.BoolVar(&RemoveQuery, "qq", false, "Remove Query String (useful when do dirbscan)")
 
 	flag.StringVar(&blacklistExt, "b", "", "Additional blacklist extensions (Ex: js,html)")
 	flag.StringVar(&toInjectList, "f", "", "Payload list")
@@ -130,15 +134,17 @@ func main() {
 				}
 			default:
 				// query
-				urls, err := QueryBuilder(u.String(), payload)
-				finalUrls = append(finalUrls, urls...)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "[QUERY] Failed to generate %s with the payload %s\n", u.String(), payload)
-					continue
+				if !RemoveQuery {
+					urls, err := QueryBuilder(u.String(), payload)
+					finalUrls = append(finalUrls, urls...)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "[QUERY] Failed to generate %s with the payload %s\n", u.String(), payload)
+						continue
+					}
 				}
 
 				// path
-				urls, err = PathBuilder(u.String(), payload)
+				urls, err := PathBuilder(u.String(), payload)
 				finalUrls = append(finalUrls, urls...)
 
 				if err != nil {
@@ -245,6 +251,14 @@ func PathBuilder(urlString string, payload string) ([]string, error) {
 		return urlList, err
 	}
 
+	if RemoveQuery {
+		q := u.Query()
+		for k, _ := range u.Query() {
+			q.Del(k)
+		}
+		u.RawQuery = q.Encode()
+	}
+
 	path := strings.TrimPrefix(u.EscapedPath(), "/")
 	paths := strings.Split(path, "/")
 
@@ -329,7 +343,7 @@ func PathBuilder(urlString string, payload string) ([]string, error) {
 		cloneURLRawPath, _ := url.PathUnescape(cloneURL.String())
 		urlList = append(urlList, cloneURLRawPath)
 
-		cloneURL.Path = strings.Join(pathClone, "/") +"?"+ payload
+		cloneURL.Path = strings.Join(pathClone, "/") + "?" + payload
 		cloneURLRawPath, _ = url.PathUnescape(cloneURL.String())
 		urlList = append(urlList, cloneURLRawPath)
 	}
