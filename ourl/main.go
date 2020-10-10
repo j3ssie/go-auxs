@@ -31,7 +31,7 @@ type CommonCrawlInfo []struct {
 var IncludeSubs bool
 var PageCheck bool
 var client = &http.Client{
-	Timeout: 2 * time.Minute, // Some sources need long time to query
+	Timeout: 5 * time.Minute, // Some sources need long time to query
 }
 
 func main() {
@@ -117,13 +117,10 @@ func getWaybackUrls(hostname string) ([]string, error) {
 				defer wg.Done()
 				page := i.(int)
 				pageDataURL := fmt.Sprintf("%s&page=%d", baseURL, page)
-				results, err := downloadWaybackResults(pageDataURL)
+				err := downloadWaybackResults(pageDataURL)
 				if err != nil {
 					printStderr(fmt.Sprintf("Failed to download url %s: %s", pageDataURL, err))
 					return
-				}
-				for _, result := range results {
-					fmt.Println(result)
 				}
 			})
 			defer pool.Release()
@@ -136,67 +133,56 @@ func getWaybackUrls(hostname string) ([]string, error) {
 		}
 		return []string{}, nil
 	} else {
-		results, err := downloadWaybackResults(baseURL)
+		err := downloadWaybackResults(baseURL)
 		if err != nil {
 			return []string{}, err
 		}
-		return results, nil
+		return []string{}, nil
 	}
 
 }
 
-func downloadWaybackResults(url string) ([]string, error) {
-	var resp *http.Response
-	retryTimes := 60
-retry:
+func downloadWaybackResults(url string) error {
+	retryTimes := 20
 	for retryTimes > 0 {
-		if retryTimes < 60 {
+		if retryTimes < 20 {
 			printStderr(fmt.Sprintf("%s: retry %d", url, 60-retryTimes))
 		}
 		time.Sleep(time.Second * 5)
-		r, err := client.Get(url)
+		resp, err := client.Get(url)
 		if err != nil {
 			retryTimes--
 			continue
 		}
-		switch r.StatusCode {
+		defer resp.Body.Close()
+		switch resp.StatusCode {
 		case 200:
-			resp = r
-			break retry
+			dec := jsoniter.NewDecoder(resp.Body)
+			for dec.More() {
+				first := true
+				var results [][]string
+				if err := dec.Decode(&results); err == nil {
+					for _, result := range results {
+						if first {
+							// skip first result from wayback machine
+							// always is "original"
+							first = false
+							continue
+						}
+						fmt.Println(result[0])
+					}
+				}
+			}
+			return nil
 		case 400:
-			return []string{}, nil
+			return errors.New("Status code: 400")
 		case 429:
 			retryTimes--
 		default:
 			retryTimes--
 		}
 	}
-	if resp == nil {
-		return nil, errors.New(fmt.Sprintf("Body empty"))
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("error reading body: %s", err.Error()))
-	}
-	resp.Body.Close()
-
-	var waybackresp [][]string
-	var found []string
-	err = jsoniter.Unmarshal(body, &waybackresp)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("could not decoding response from wayback machine: %s", err.Error()))
-	}
-	first := true
-	for _, result := range waybackresp {
-		if first {
-			// skip first result from wayback machine
-			// always is "original"
-			first = false
-			continue
-		}
-		found = append(found, result[0])
-	}
-	return found, nil
+	return errors.New("Max try times")
 }
 
 func getWaybackPages(url string) int {
