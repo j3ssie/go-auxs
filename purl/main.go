@@ -71,9 +71,7 @@ func main() {
 				continue
 			}
 
-			if len(val) < limit {
-				fmt.Println(val)
-			}
+			fmt.Println(val)
 
 			// no point using up memory if we're outputting dupes
 			if unique {
@@ -178,7 +176,11 @@ func format(u *url.URL, f string) []string {
 			rPaths := u.EscapedPath()
 			var paths string
 			if strings.Contains(rPaths, "/") {
-				paths = strings.Join(strings.Split(rPaths, "/"), "\n")
+				for _, p := range strings.Split(rPaths, "/") {
+					if len(p) < limit {
+						paths += p + "\n"
+					}
+				}
 				paths = strings.Trim(paths, "\n")
 			}
 			out.WriteString(paths)
