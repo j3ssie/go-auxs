@@ -10,23 +10,42 @@ import (
 
 // just join all the content with character
 // cat /tmp/list_of_IP | jjoin
-// cat /tmp/list_of_IP | jjoin -d " "
-// cat /tmp/list_of_IP | jjoin -s '"'
-var verbose bool
+// cat /tmp/list_of_IP | jjoin -d "."
+// cat /tmp/list_of_IP | jjoin -j ' '
+var (
+	delimiterString string
+	joinString      string
+	newLine         bool
+)
 
 func main() {
 	// cli aguments
-	strip := flag.String("s", "", "strip char")
-	seperate := flag.String("d", ",", "delimiter char")
+	flag.StringVar(&delimiterString, "d", ",", "delimiter char to split")
+	flag.StringVar(&joinString, "j", " ", "String to join after split")
+	flag.BoolVar(&newLine, "n", false, "delimiter char")
 	flag.Parse()
-	var result []string
+
+	if newLine {
+		joinString = "\n"
+	}
+
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
-		line := sc.Text()
-		if *strip != "" {
-			line = strings.Replace(line, *strip, "", -1)
+		line := strings.TrimSpace(sc.Text())
+		if err := sc.Err(); err == nil && line != "" {
+			handleString(line)
 		}
-		result = append(result, strings.TrimSpace(line))
 	}
-	fmt.Println(strings.Join(result, *seperate))
+}
+
+func handleString(raw string) {
+	var result []string
+	if !strings.Contains(raw, delimiterString) {
+		result = append(result, raw)
+		fmt.Println(strings.Join(result, joinString))
+		return
+	}
+
+	result = strings.Split(raw, delimiterString)
+	fmt.Println(strings.Join(result, joinString))
 }
