@@ -112,29 +112,8 @@ func paths(u *url.URL, f string) []string {
 }
 
 func format(u *url.URL, f string) []string {
-	domain := u.Host
-	org := u.Host
-	suffix, ok := publicsuffix.PublicSuffix(domain)
-	if ok {
-		org = strings.Replace(domain, fmt.Sprintf(".%s", suffix), "", -1)
-	} else {
-		if strings.Contains(domain, ".") {
-			parts := strings.Split(domain, ".")
-			if len(parts) == 2 {
-				org = parts[0]
-			} else {
-				org = parts[len(parts)-2]
-			}
-		}
-	}
-	rPaths := u.EscapedPath()
-	var paths string
-	if strings.Contains(rPaths, "/") {
-		paths = strings.Join(strings.Split(rPaths, "/"), "\n")
-	}
 
 	out := &bytes.Buffer{}
-
 	inFormat := false
 	for _, r := range f {
 
@@ -151,22 +130,65 @@ func format(u *url.URL, f string) []string {
 		switch r {
 		case '%':
 			out.WriteRune('%')
+
 		case 's':
 			out.WriteString(u.Scheme)
 		case 'd':
 			out.WriteString(u.Hostname())
-		case 'o':
-			out.WriteString(org)
 		case 'P':
 			out.WriteString(u.Port())
 		case 'p':
 			out.WriteString(u.EscapedPath())
-		case 'e':
-			out.WriteString(paths)
 		case 'q':
 			out.WriteString(u.RawQuery)
 		case 'f':
 			out.WriteString(u.Fragment)
+		case 'n':
+			out.WriteRune('\n')
+		case 'o':
+			domain := u.Host
+			org := u.Host
+			suffix, ok := publicsuffix.PublicSuffix(domain)
+			if ok {
+				org = strings.Replace(domain, fmt.Sprintf(".%s", suffix), "", -1)
+			} else {
+				if strings.Contains(domain, ".") {
+					parts := strings.Split(domain, ".")
+					if len(parts) == 2 {
+						org = parts[0]
+					} else {
+						org = parts[len(parts)-2]
+					}
+				}
+			}
+			out.WriteString(org)
+		case 'D':
+			var dots string
+			if strings.Contains(u.Host, ".") {
+				dots = strings.Join(strings.Split(u.Host, "."), "\n")
+				dots = strings.Trim(dots, "\n")
+			}
+			out.WriteString(dots)
+		// get paths but in lists
+		case 'E':
+			rPaths := u.EscapedPath()
+			var paths string
+			if strings.Contains(rPaths, "/") {
+				paths = strings.Join(strings.Split(rPaths, "/"), "\n")
+				paths = strings.Trim(paths, "\n")
+			}
+			out.WriteString(paths)
+		// get query but in lists
+		case 'Q':
+			rQueries := u.Query()
+			var queries string
+			if len(rQueries) > 0 {
+				for k := range rQueries {
+					queries += k + "\n"
+				}
+			}
+			queries = strings.Trim(queries, "\n")
+			out.WriteString(queries)
 		default:
 			// output untouched
 			out.WriteRune('%')
@@ -175,7 +197,7 @@ func format(u *url.URL, f string) []string {
 
 		inFormat = false
 	}
-	
+
 	return []string{out.String()}
 }
 
@@ -199,6 +221,7 @@ func init() {
 
 		h += "Format Directives:\n"
 		h += "  %%  A literal percent character\n"
+		h += "  %n  A new line character\n"
 		h += "  %s  The request scheme (e.g. https)\n"
 		h += "  %d  The domain (e.g. sub.example.com)\n"
 		h += "  %o  The root domain (e.g. example)\n"
@@ -211,6 +234,7 @@ func init() {
 		h += "Examples:\n"
 		h += "  cat urls.txt | purl keys\n"
 		h += "  cat urls.txt | purl format %s://%d%p?%q\n"
+		h += "  cat urls.txt | purl format %D%n%E%n%Q\n"
 
 		fmt.Fprint(os.Stderr, h)
 	}
