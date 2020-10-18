@@ -13,6 +13,7 @@ import (
 
 // Literally copied from: https://github.com/tomnomnom/unfurl
 // with some improvements
+	var limit int
 
 func main() {
 	var unique bool
@@ -22,6 +23,7 @@ func main() {
 	var verbose bool
 	flag.BoolVar(&verbose, "v", false, "")
 	flag.BoolVar(&verbose, "verbose", false, "")
+	flag.IntVar(&limit, "l", 100, "limit size")
 
 	flag.Parse()
 
@@ -69,7 +71,9 @@ func main() {
 				continue
 			}
 
-			fmt.Println(val)
+			if len(val) < limit {
+				fmt.Println(val)
+			}
 
 			// no point using up memory if we're outputting dupes
 			if unique {
