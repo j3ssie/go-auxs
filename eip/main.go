@@ -103,7 +103,9 @@ func extendRange(rangeIP string, sub int) []string {
 		ip := net.ParseIP(rangeIP)
 		if ip != nil {
 			if port == "" || sub != 32 {
-				fmt.Println(ip)
+				ipb := net.ParseIP(ip.String())
+				ipnb := iplib.NewNet(ipb, sub)
+				result = append(result, ipnb.String())
 			} else {
 				for _, p := range ports {
 					fmt.Printf("%s:%s\n", ip, p)
@@ -112,8 +114,10 @@ func extendRange(rangeIP string, sub int) []string {
 		}
 		return result
 	}
+
 	extendedIPs, err := ipna.Subnet(sub)
 	if err != nil {
+		fmt.Fprint(os.Stderr, err)
 		return result
 	}
 	for _, item := range extendedIPs {

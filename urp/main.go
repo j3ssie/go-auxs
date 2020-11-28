@@ -59,20 +59,22 @@ func main() {
 	flag.BoolVar(&RemoveQuery, "qq", false, "Remove Query String (useful when do dirbscan)")
 
 	flag.StringVar(&blacklistExt, "b", "", "Additional blacklist extensions (Ex: js,html)")
-	flag.StringVar(&toInjectList, "f", "", "Payload list")
 	// new one
 	flag.StringVar(&place, "i", "one-by-one", "Where to inject (when using with path or value)\n  all: replace all\n  one: replace one by one\n  2: replace the second path/param\n  -2: replace the second path/param from the end")
 	flag.BoolVar(&InjectAll, "A", true, "Inject All")
 	flag.StringVar(&injectWords, "I", "FUZZ", "Inject Words to replace")
+	flag.StringVar(&toInjectList, "iL", "", "Payload list")
 	flag.Parse()
 
 	// prepare words
+	payloadList = append(payloadList, injectWords)
 	if toInjectList != "" {
 		pf, err := os.Open(toInjectList)
 		if err != nil {
 			panic(err)
 		}
 		defer pf.Close()
+		payloadList = []string{}
 		scPayload := bufio.NewScanner(pf)
 		for scPayload.Scan() {
 			line := strings.TrimSpace(scPayload.Text())
@@ -81,7 +83,6 @@ func main() {
 			}
 		}
 	}
-	payloadList = append(payloadList, injectWords)
 
 	if blacklistExt != "" {
 		bl := strings.Split(blacklistExt, ",")
@@ -98,6 +99,8 @@ func main() {
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
 		raw := strings.TrimSpace(sc.Text())
+
+
 		if RemoveDummyPort {
 			raw = strings.Replace(raw, ":80/", "/", -1)
 		}
@@ -163,6 +166,7 @@ func main() {
 			}
 		}
 	}
+
 }
 
 func QueryBuilder(urlString string, payload string) ([]string, error) {
