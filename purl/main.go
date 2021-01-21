@@ -13,7 +13,7 @@ import (
 
 // Literally copied from: https://github.com/tomnomnom/unfurl
 // with some improvements
-	var limit int
+var limit int
 
 func main() {
 	var unique bool

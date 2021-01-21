@@ -3,78 +3,110 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
-	"github.com/ysmood/rod"
-	"github.com/ysmood/rod/lib/launcher"
+	"github.com/skratchdot/open-golang/open"
 	"os"
+	"sort"
 	"strings"
-	"sync"
-	"time"
 )
 
-// Open URL with chromium with your browser session
+// Open URL with your default browser
+// Usage:
+// cat urls.txt | oic
+// cat urls.txt | oic -a 'Google Chrome Canary'
+// oic http://example.com
+
 var (
 	verbose     bool
-	devTool     bool
 	concurrency int
-	timeout     int
-	proxy       string
-	viaBurp     bool
+	appName     string
+	data        string
+	dataFile    string
 )
 
 func main() {
-	// cli aguments
-	flag.StringVar(&proxy, "proxy", "", "Proxy")
-	flag.BoolVar(&devTool, "dev", false, "Enable Devtools")
-	flag.BoolVar(&verbose, "v", false, "Enable popup")
-	flag.BoolVar(&viaBurp, "b", false, "Shortcut for -proxy 'http://127.0.0.1' ")
-	flag.IntVar(&concurrency, "c", 3, "concurrency ")
-	flag.IntVar(&timeout, "t", 3, "minutes to close")
-	// custom help
-	flag.Usage = func() {
-		usage()
-		os.Exit(1)
-	}
+	// cli args
+	flag.StringVar(&appName, "a", "", "App name")
+	flag.StringVar(&data, "u", "", "URL to open")
+	flag.StringVar(&dataFile, "U", "", "URL to open")
+	flag.BoolVar(&verbose, "v", false, "verbose mode")
+	flag.IntVar(&concurrency, "c", 5, "number of tab at a time")
 	flag.Parse()
-	if viaBurp {
-		proxy = "http://127.0.0.1:8080"
+
+	// get app name from ENV
+	if appName == "" {
+		newApp, ok := os.LookupEnv("OIC_APP")
+		if ok {
+			appName = newApp
+		}
 	}
 
-	var wg sync.WaitGroup
-	// init headless
-	base := launcher.New().
-		Headless(false). // run chrome on foreground, you can also use env "rod=show"
-		Set("proxy-server", proxy).
-		// add a flag, here we set a http proxy
-		//Devtools(true). // open devtools for each new tab
-		Launch()
-
-
-	browser := rod.New().
-		ControlURL(base).
-		Trace(true). // show trace of each input action
-		Slowmotion(2 * time.Second). // each input action will take 2 second
-		Connect().
-		Timeout(time.Minute)
-
-	sc := bufio.NewScanner(os.Stdin)
-	for sc.Scan() {
-		url := strings.TrimSpace(sc.Text())
-		browser.Page(url)
+	// detect if anything came from std
+	var inputs []string
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		sc := bufio.NewScanner(os.Stdin)
+		for sc.Scan() {
+			target := strings.TrimSpace(sc.Text())
+			if err := sc.Err(); err == nil && target != "" {
+				inputs = append(inputs, target)
+			}
+		}
 	}
-	wg.Wait()
 
-	fmt.Printf("Press 'Ctrl + C' to close or wait for %v minutes\n", timeout)
-	time.Sleep(time.Duration(timeout) * time.Minute)
-	browser.Close()
+	if data != "" {
+		inputs = append(inputs, data)
+	}
+	if dataFile != "" {
+		inputs = append(inputs, ReadingLines(dataFile)...)
+	}
+
+	if (stat.Mode()&os.ModeCharDevice) != 0 && len(inputs) == 0 {
+		args := os.Args[1:]
+		sort.Strings(args)
+		raw := args[len(args)-1]
+		OpenString(raw)
+		os.Exit(0)
+	}
+
+	var count int
+	for _, raw := range inputs {
+		if count == concurrency {
+			reader := bufio.NewReader(os.Stdin)
+			reader.ReadString('\n')
+		}
+		OpenString(raw)
+		count++
+	}
 }
 
-func usage() {
-	func() {
-		h := "Open in Chrome \n\n"
-		h += "Usage:\n"
-		h += "cat list_urls.txt | oic -v \n"
-		h += "oic example.com github.com\n"
-		fmt.Fprint(os.Stderr, h)
-	}()
+func OpenString(raw string) {
+	if appName != "" {
+		open.RunWith(raw, appName)
+		return
+	}
+	open.Run(raw)
+}
+
+// ReadingLines Reading file and return content as []string
+func ReadingLines(filename string) []string {
+	var result []string
+	file, err := os.Open(filename)
+	if err != nil {
+		return result
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		val := strings.TrimSpace(scanner.Text())
+		if val == "" {
+			continue
+		}
+		result = append(result, val)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return result
+	}
+	return result
 }
