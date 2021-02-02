@@ -13,6 +13,7 @@ Collection of auxiliary command line tools
 | **bparse**        | parsing burp XML file               |
 | **arank**         | Get alexa rank of list of urls      |
 | **chrunk**         | Run your command against really really big file.      |
+| **oic**         | Open your urls on default brwoser      |
 
 ***
 
