@@ -24,11 +24,11 @@ var (
 	alexa   bool
 	extra   bool
 	ports   string
+	concurrency int
 )
 
 func main() {
 	// cli aguments
-	var concurrency int
 	flag.IntVar(&concurrency, "c", 20, "Set the concurrency level")
 	flag.BoolVar(&alexa, "a", false, "Check Alexa Rank of domain")
 	flag.BoolVar(&extra, "e", false, "Append common extra HTTPS port too")
