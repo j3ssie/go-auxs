@@ -4,7 +4,7 @@ Extract domain from SSL info
 
 ## Install
 
-```
+```shell
 go get -u github.com/j3ssie/go-auxs/cinfo
 ```
 

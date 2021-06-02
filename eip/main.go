@@ -99,6 +99,7 @@ func extendURL(raw string) []string {
 func extendRange(rangeIP string, sub int) []string {
 	var result []string
 	_, ipna, err := iplib.ParseCIDR(rangeIP)
+
 	if err != nil {
 		ip := net.ParseIP(rangeIP)
 		if ip != nil {
@@ -116,10 +117,25 @@ func extendRange(rangeIP string, sub int) []string {
 	}
 
 	extendedIPs, err := ipna.Subnet(sub)
+
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
-		return result
+		// change the subnet mask
+		if err.Error() == "illegal mask length provided" {
+			rangeIP = fmt.Sprintf("%v/%v", ipna.IP.String(), sub)
+			_, ipna, err := iplib.ParseCIDR(rangeIP)
+			if err == nil {
+				extendedIPs, err = ipna.Subnet(sub)
+				if err != nil {
+					fmt.Fprint(os.Stderr, rangeIP, " -- ", err, "\n")
+					return result
+				}
+			}
+		} else {
+			fmt.Fprint(os.Stderr, rangeIP, " -- ", err, "\n")
+			return result
+		}
 	}
+
 	for _, item := range extendedIPs {
 		ip := item.String()
 		if sub == 32 {
@@ -129,7 +145,7 @@ func extendRange(rangeIP string, sub int) []string {
 			result = append(result, ip)
 		} else {
 			for _, p := range ports {
-				ipWithPort := fmt.Sprintf("%s:%s", ip, p)
+				ipWithPort := fmt.Sprintf("%v:%v", ip, p)
 				result = append(result, ipWithPort)
 			}
 		}
@@ -153,13 +169,13 @@ func genPorts(port string) []string {
 	case "full":
 		var ports []string
 		for i := 1; i <= 65535; i++ {
-			ports = append(ports, fmt.Sprintf("%s", i))
+			ports = append(ports, fmt.Sprintf("%v", i))
 		}
 		return ports
 	case "f":
 		var ports []string
 		for i := 1; i <= 65535; i++ {
-			ports = append(ports, fmt.Sprintf("%d", i))
+			ports = append(ports, fmt.Sprintf("%v", i))
 		}
 		return ports
 	default:

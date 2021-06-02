@@ -66,9 +66,9 @@ func checkClean(line string) {
 	}
 	name = removeAsteriskLabel(name)
 
-	// ignore if
 	if target != "" {
-		if !strings.Contains(name, target) && (name == target) {
+		// only accept sub.target.com and target.com
+		if !strings.Contains(name, "."+target) && (name != target) {
 			return
 		}
 	}
