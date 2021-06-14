@@ -1,5 +1,5 @@
 ## Open in Chrome
-Open URL with your default browser
+Open URL with your real browser
 
 
 ## Install
@@ -12,6 +12,6 @@ go get -u github.com/j3ssie/go-auxs/oic
 
 ```bash
 cat urls.txt | oic
-cat urls.txt | oic -a 'Google Chrome Canary'
-oic http://example.com
+cat urls.txt | oic -c 5 -proxy http://127.0.0.1:8080
+cat urls.txt | oic -c 5 -proxy http://127.0.0.1:8080 -q
 ```
