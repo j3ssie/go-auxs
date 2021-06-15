@@ -5,10 +5,8 @@ import (
 	"context"
 	"flag"
 	"github.com/chromedp/chromedp"
-	"github.com/skratchdot/open-golang/open"
 	"log"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -24,10 +22,9 @@ import (
 
 var (
 	verbose     bool
-	headless     bool
+	headless    bool
 	concurrency int
 	timeout     int
-	appName     string
 	data        string
 	dataFile    string
 	proxy       string
@@ -35,23 +32,13 @@ var (
 
 func main() {
 	// cli args
-	flag.StringVar(&appName, "a", "", "App name")
 	flag.StringVar(&data, "u", "", "URL to open")
 	flag.StringVar(&dataFile, "U", "", "URL to open")
 	flag.IntVar(&concurrency, "c", 5, "number of tab at a time")
-	flag.IntVar(&timeout, "t", 0, "timeout")
-	flag.StringVar(&proxy, "proxy", "", "proxy")
-	flag.BoolVar(&verbose, "v", false, "verbose mode")
+	flag.IntVar(&timeout, "t", 15, "timeout in second")
+	flag.StringVar(&proxy, "proxy", "", "proxy to pass chrome to (eg: http://127.0.0.1:8080)")
 	flag.BoolVar(&headless, "q", false, "enable headless")
 	flag.Parse()
-
-	// get app name from ENV
-	if appName == "" {
-		newApp, ok := os.LookupEnv("OIC_APP")
-		if ok {
-			appName = newApp
-		}
-	}
 
 	// detect if anything came from std
 	var inputs []string
@@ -157,32 +144,6 @@ func cleanUp() {
 	for _, junk := range junks {
 		os.RemoveAll(junk)
 	}
-}
-
-func OpenString(raw string) {
-	if appName != "" {
-		open.RunWith(raw, appName)
-		return
-	}
-	open.Run(raw)
-}
-
-func RunOSCommand(rawCmd string) int {
-	command := []string{
-		"bash",
-		"-c",
-		rawCmd,
-	}
-	cmd := exec.Command(command[0], command[1:]...)
-	//cmd := exec.Command(command)
-	cmd.Stdout = os.Stdout
-	err := cmd.Start()
-	if err != nil {
-		log.Printf("err %v", err)
-		return 0
-	}
-	log.Printf("Just ran subprocess %d, exiting\n", cmd.Process.Pid)
-	return cmd.Process.Pid
 }
 
 // ReadingLines Reading file and return content as []string
