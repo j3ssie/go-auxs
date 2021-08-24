@@ -15,21 +15,24 @@ import (
 	"sync"
 
 	"github.com/genkiroid/cert"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // Extract domain from SSL info
 // cat /tmp/list_of_IP | cinfo -c 100
 var (
-	verbose bool
-	alexa   bool
-	extra   bool
-	ports   string
+	verbose     bool
+	alexa       bool
+	extra       bool
+	jsonOutput  bool
+	ports       string
 	concurrency int
 )
 
 func main() {
-	// cli aguments
+	// cli arguments
 	flag.IntVar(&concurrency, "c", 20, "Set the concurrency level")
+	flag.BoolVar(&jsonOutput, "json", false, "Show Output as Json format")
 	flag.BoolVar(&alexa, "a", false, "Check Alexa Rank of domain")
 	flag.BoolVar(&extra, "e", false, "Append common extra HTTPS port too")
 	flag.StringVar(&ports, "p", "443,8443,9443", "Common extra HTTPS port too (default: 443,8443,9443)")
@@ -120,6 +123,12 @@ func getHostName(raw string, port string) string {
 	return hostname
 }
 
+type CertInfo struct {
+	Input   string   `json:"input"`
+	Domains []string `json:"domains"`
+	Info    string   `json:"info"`
+}
+
 func getCerts(raw string) bool {
 	var certs cert.Certs
 	var err error
@@ -132,23 +141,44 @@ func getCerts(raw string) bool {
 		return false
 	}
 
+	certInfo := CertInfo{
+		Input: raw,
+	}
+
 	for _, certItem := range certs {
 		if verbose {
 			info, err := GetCertificatesInfo(raw)
+			certInfo.Info = info
 			if err == nil {
-				fmt.Printf("%s - %s\n", raw, info)
+				if !jsonOutput {
+					fmt.Printf("%s - %s\n", raw, info)
+				}
 			}
 		}
 
 		for _, domain := range certItem.SANs {
+			data := domain
 			if alexa {
 				rank, _ = getAlexaRank(domain)
-				fmt.Printf("%v,%v,%s\n", raw, domain, rank)
+				data = fmt.Sprintf("%v,%v,%s", raw, domain, rank)
+			} else if !jsonOutput {
+				data = fmt.Sprintf("%v,%v", raw, domain)
+			}
+
+			if jsonOutput {
+				certInfo.Domains = append(certInfo.Domains, data)
 			} else {
-				fmt.Printf("%v,%v\n", raw, domain)
+				fmt.Println(data)
 			}
 		}
 	}
+
+	if jsonOutput {
+		if data, err := jsoniter.MarshalToString(certInfo); err == nil {
+			fmt.Println(data)
+		}
+	}
+
 	return true
 
 }
@@ -162,7 +192,6 @@ func getAlexaRank(raw string) (string, error) {
 	}
 
 	defer resp.Body.Close()
-
 	alexaData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return rank, err
@@ -188,6 +217,9 @@ func getAlexaRank(raw string) (string, error) {
 }
 
 func GetCertificatesInfo(address string) (string, error) {
+	if !strings.Contains(address, ":") {
+		address = fmt.Sprintf("%s:443", address)
+	}
 	conn, err := tls.Dial("tcp", address, &tls.Config{
 		InsecureSkipVerify: true,
 	})

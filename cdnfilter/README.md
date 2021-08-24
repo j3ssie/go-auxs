@@ -1,6 +1,6 @@
 # CDN Filter
 
-Cleaning CDN IP Adress and Private IPs from inputs
+Cleaning CDN IP Address and Private IPs from list of inputs
 
 ## Install
 
