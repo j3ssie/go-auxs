@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"golang.org/x/net/publicsuffix"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -185,6 +186,21 @@ func getCerts(raw string) bool {
 
 func getAlexaRank(raw string) (string, error) {
 	rank := "-1"
+
+	if strings.Contains(raw, "*.") {
+		raw = strings.ReplaceAll(raw, "*.", "")
+	}
+
+	// sub.example.com --> example.com
+	suffix, ok := publicsuffix.PublicSuffix(raw)
+	if ok {
+		root := strings.ReplaceAll(raw, fmt.Sprintf(".%s", suffix), "")
+		if strings.Contains(root, ".") {
+			parts := strings.Split(root, ".")
+			root = parts[len(parts)-1]
+			raw = fmt.Sprintf("%s.%s", root, suffix)
+		}
+	}
 
 	resp, err := http.Get("http://data.alexa.com/data?cli=10&dat=snbamz&url=" + raw)
 	if err != nil {

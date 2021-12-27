@@ -245,6 +245,9 @@ func downloadWaybackResults(downloadURL string) error {
 							first = false
 							continue
 						}
+						if result[3] != "" && result[3] == "warc/revisit" {
+							continue
+						}
 						if result[2] == "" {
 							continue
 						}
@@ -273,7 +276,6 @@ func downloadWaybackResults(downloadURL string) error {
 							}
 						} else {
 							fmt.Println(result[2])
-
 						}
 					}
 				}
