@@ -1,5 +1,5 @@
 module github.com/j3ssie/go-auxs/eip
 
-go 1.16
+go 1.17
 
-require github.com/c-robinson/iplib v0.3.1
+require github.com/c-robinson/iplib v1.0.3
