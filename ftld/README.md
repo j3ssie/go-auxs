@@ -12,7 +12,6 @@ target.es
 target.cn
 target.com.cn
 
-
 # input the org directly
 ftld -c 50 -o 'target'
 

@@ -17,11 +17,16 @@ var (
 	limit         int
 )
 
+// only get word with 100
+// cat scope | wlimit -l 100
+// # get only the line with 1 '.'
+// cat list-of-domains | wlimit -sc 1 -s '.'
+
 func main() {
 	flag.IntVar(&concurrency, "c", 50, "Set the concurrency level")
-	flag.IntVar(&limit, "l", 20, "String length limit")
-	flag.StringVar(&stringToCount, "s", "", "String length limit")
-	flag.IntVar(&stringCount, "sc", 1, "String length limit")
+	flag.IntVar(&limit, "l", 100, "String length limit")
+	flag.StringVar(&stringToCount, "s", "", "String to count")
+	flag.IntVar(&stringCount, "sc", 1, "Number of string to count")
 
 	flag.Parse()
 
