@@ -23,17 +23,16 @@ Collection of auxiliary command line tools
 All the tools
 
 ```shell
-go get -u github.com/j3ssie/go-auxs/...
+go install -u github.com/j3ssie/go-auxs/...@latest
 ```
 
 or single tool
 
 ```shell
-go get github.com/j3ssie/go-auxs/<utils-name>
+go install -v github.com/j3ssie/go-auxs/<utils-name>@latest
 ```
 
 ## Donation
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/j3ssiejjj)
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/j3ssie)
