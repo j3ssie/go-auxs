@@ -2,226 +2,357 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/xml"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
-
-	"github.com/mitchellh/go-homedir"
 )
 
-type Items struct {
-	XMLName     xml.Name `xml:"items"`
-	Text        string   `xml:",chardata"`
-	BurpVersion string   `xml:"burpVersion,attr"`
-	ExportTime  string   `xml:"exportTime,attr"`
-	Item        []struct {
+type blob struct {
+	Text   string `xml:",chardata"`
+	Base64 bool   `xml:"base64,attr"`
+}
+
+// raw returns the bytes Burp stored, base64-decoded when flagged.
+func (b blob) raw() []byte {
+	if !b.Base64 {
+		return []byte(b.Text)
+	}
+	d, err := base64.StdEncoding.DecodeString(b.Text)
+	if err != nil {
+		return []byte(b.Text)
+	}
+	return d
+}
+
+type Item struct {
+	URL  string `xml:"url"`
+	Host struct {
 		Text string `xml:",chardata"`
-		Time string `xml:"time"`
-		URL  string `xml:"url"`
-		Host struct {
-			Text string `xml:",chardata"`
-			Ip   string `xml:"ip,attr"`
-		} `xml:"host"`
-		Port      string `xml:"port"`
-		Protocol  string `xml:"protocol"`
-		Method    string `xml:"method"`
-		Path      string `xml:"path"`
-		Extension string `xml:"extension"`
-		Request   struct {
-			Text   string `xml:",chardata"`
-			Base64 string `xml:"base64,attr"`
-		} `xml:"request"`
-		Status         string `xml:"status"`
-		Responselength string `xml:"responselength"`
-		Mimetype       string `xml:"mimetype"`
-		Response       struct {
-			Text   string `xml:",chardata"`
-			Base64 string `xml:"base64,attr"`
-		} `xml:"response"`
-		Comment string `xml:"comment"`
-	} `xml:"item"`
+		IP   string `xml:"ip,attr"`
+	} `xml:"host"`
+	Port           string `xml:"port"`
+	Protocol       string `xml:"protocol"`
+	Method         string `xml:"method"`
+	Path           string `xml:"path"`
+	Request        blob   `xml:"request"`
+	Status         string `xml:"status"`
+	Responselength string `xml:"responselength"`
+	Mimetype       string `xml:"mimetype"`
+	Response       blob   `xml:"response"`
+}
+
+type Items struct {
+	Item []Item `xml:"item"`
 }
 
 var (
-	burpFile   string
-	output     string
-	isBase64   bool
-	noBody     bool
-	flat       bool
-	stripComma bool
+	burpFile string
+	output   string
+	noBody   bool
+	flat     bool
+	decode   bool
+	dump     bool
+	top      int
 )
 
-// Usage:
-// bparse -o output.csv burp-file
-// bparse -n -o output.csv burp-file
-// bparse  -i burp-file -f -o output
+const usage = `Usage:
+  bparse [flags] burp.xml        export to CSV (or -f: one base64 request per line)
+  bparse stat [flags] burp.xml   print statistics
+
+Flags:
+`
 
 func main() {
-	// cli arguments
-	flag.StringVar(&burpFile, "i", "", "Burp file (default is last argument)")
-	flag.StringVar(&output, "o", "out", "Output file")
-	flag.BoolVar(&noBody, "n", false, "Don't store body in csv output")
-	flag.BoolVar(&isBase64, "b", true, "is Burp XML base64 encoded")
-	flag.BoolVar(&flat, "f", false, "Store raw request base64 line by line")
-	flag.BoolVar(&stripComma, "s", true, "Encode ',' in case it appear in data")
-	flag.Parse()
 	args := os.Args[1:]
-	sort.Strings(args)
+	stat := len(args) > 0 && args[0] == "stat"
+	if stat {
+		args = args[1:]
+	}
+	flag.StringVar(&burpFile, "i", "", "Burp file (default is first positional argument)")
+	flag.StringVar(&output, "o", "", "Output file (default out.csv, or out.txt with -f)")
+	flag.BoolVar(&noBody, "n", false, "Don't include request/response bodies")
+	flag.BoolVar(&decode, "d", false, "Write bodies as decoded text instead of base64 (gzip/chunked handled)")
+	flag.BoolVar(&dump, "r", false, "Print every request/response fully decoded to stdout (for grep)")
+	flag.BoolVar(&flat, "f", false, "Write raw requests, base64, one per line")
+	flag.IntVar(&top, "top", 10, "stat: number of top hosts/URLs to show")
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage); flag.PrintDefaults() }
+	// flag stops at the first positional arg; keep parsing so flags may follow the file name
+	var pos []string
+	for {
+		flag.CommandLine.Parse(args)
+		if flag.NArg() == 0 {
+			break
+		}
+		pos = append(pos, flag.Arg(0))
+		args = flag.Args()[1:]
+	}
+	if burpFile == "" && len(pos) > 0 {
+		burpFile = pos[0]
+	}
 	if burpFile == "" {
-		burpFile = args[len(args)-1]
-	}
-	content := GetFileContent(burpFile)
-	if content == "" {
-		fmt.Printf("failed to read content of %v \n", burpFile)
-		return
+		flag.Usage()
+		os.Exit(2)
 	}
 
-	// parsing content
-	r := &Items{}
-	err := xml.Unmarshal([]byte(content), r)
-	if err != nil {
-		fmt.Printf("failed to parse Burp XML file: %v \n", err)
-		return
-	}
-
-	// URL, Host, Method, Path, IP:Port, Status, Responselength, Body
-	csvHeader := []string{"URL", "Method", "Host", "Path", "Protocol", "IP:Port", "Status", "Responselength", "Body"}
-	if noBody {
-		csvHeader = []string{"URL", "Method", "Host", "Path", "Protocol", "IP:Port", "Status", "Responselength"}
-	}
-	csvData := [][]string{
-		csvHeader,
-	}
-	if !flat {
-		fmt.Println(strings.Join(csvHeader, ","))
-	}
-
-	var flatOutput []string
-	// loop through data
-	for _, item := range r.Item {
+	if output == "" {
+		output = "out.csv"
 		if flat {
-			flatOutput = append(flatOutput, item.Request.Text)
-			fmt.Println(item.Request.Text)
-			continue
+			output = "out.txt"
 		}
-		if stripComma {
-			if strings.Contains(item.URL, ",") {
-				item.URL = strings.Replace(item.URL, ",", "%2c", -1)
-			}
-			if strings.Contains(item.Path, ",") {
-				item.Path = strings.Replace(item.Path, ",", "%2c", -1)
-			}
-		}
+	}
+	src := stream(burpFile)
+	switch {
+	case stat:
+		fatalIf(printStats(src))
+	case dump:
+		fatalIf(writeDump(src))
+	case flat:
+		fatalIf(writeFlat(src))
+	default:
+		fatalIf(writeCSV(src))
+	}
+}
 
-		dest := fmt.Sprintf("%v:%v", item.Host.Ip, item.Port)
-		data := []string{
-			item.URL, item.Method, item.Host.Text, item.Path, item.Protocol, dest, item.Status, item.Responselength,
+func fatal(err error) { fmt.Fprintln(os.Stderr, "error:", err); os.Exit(1) }
+func fatalIf(err error) {
+	if err != nil {
+		fatal(err)
+	}
+}
+
+// source calls fn for every <item>, decoding one at a time so memory stays flat on huge exports.
+type source func(fn func(Item)) error
+
+func stream(name string) source {
+	if strings.HasPrefix(name, "~/") {
+		if h, err := os.UserHomeDir(); err == nil {
+			name = filepath.Join(h, name[2:])
 		}
+	}
+	return func(fn func(Item)) error {
+		f, err := os.Open(name)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		d := xml.NewDecoder(bufio.NewReader(f))
+		for {
+			tok, err := d.Token()
+			if err == io.EOF {
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("parsing Burp XML: %w", err)
+			}
+			if se, ok := tok.(xml.StartElement); ok && se.Name.Local == "item" {
+				var it Item
+				if err := d.DecodeElement(&it, &se); err != nil {
+					return fmt.Errorf("parsing Burp XML: %w", err)
+				}
+				fn(it)
+			}
+		}
+	}
+}
+
+func writeFlat(src source) error {
+	f, err := os.Create(output)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	n := 0
+	err = src(func(it Item) {
+		fmt.Fprintln(w, base64.StdEncoding.EncodeToString(it.Request.raw()))
+		n++
+	})
+	if err != nil {
+		return err
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	fmt.Printf("wrote %d requests to %s\n", n, output)
+	return nil
+}
+
+// writeDump prints each item as decoded plain text: headers as-is, body un-chunked/un-gzipped.
+func writeDump(src source) error {
+	w := bufio.NewWriter(os.Stdout)
+	n := 0
+	err := src(func(it Item) {
+		n++
+		fmt.Fprintf(w, "=== #%d %s %s [%s] ===\n--- request ---\n", n, it.Method, it.URL, it.Status)
+		w.Write(message(it.Request.raw(), false))
+		fmt.Fprint(w, "\n--- response ---\n")
+		w.Write(message(it.Response.raw(), true))
+		fmt.Fprint(w, "\n\n")
+	})
+	if err != nil {
+		return err
+	}
+	return w.Flush()
+}
+
+func message(raw []byte, isResp bool) []byte {
+	for _, sep := range []string{"\r\n\r\n", "\n\n"} {
+		if head, _, ok := bytes.Cut(raw, []byte(sep)); ok {
+			return append(append(head, sep...), body(raw, isResp)...)
+		}
+	}
+	return raw
+}
+
+func writeCSV(src source) error {
+	f, err := os.Create(output)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	w := csv.NewWriter(f) // handles commas, quotes and newlines itself
+	hdr := []string{"URL", "Method", "Host", "Path", "Protocol", "IP:Port", "Status", "Responselength", "Mimetype"}
+	if !noBody {
+		hdr = append(hdr, "RequestBody", "ResponseBody")
+	}
+	w.Write(hdr)
+	n := 0
+	err = src(func(it Item) {
+		n++
+		row := []string{it.URL, it.Method, it.Host.Text, it.Path, it.Protocol,
+			it.Host.IP + ":" + it.Port, it.Status, it.Responselength, it.Mimetype}
 		if !noBody {
-			body := GetReqBody(item.Request.Text)
-			data = []string{
-				item.URL, item.Method, item.Host.Text, item.Path, item.Protocol, dest, item.Status, item.Responselength, body,
-			}
+			row = append(row, encodeBody(it.Request.raw(), false), encodeBody(it.Response.raw(), true))
 		}
-		csvData = append(csvData, data)
-		fmt.Println(strings.Join(data, ","))
-	}
-	if flat {
-		WriteToFile(output, strings.Join(flatOutput, "\n"))
-		return
-	}
-
-	// write to CSV
-	csvFile, err := os.Create(output)
+		w.Write(row)
+	})
 	if err != nil {
-		fmt.Printf("failed to write csv data: %s \n", err)
-		return
+		return err
 	}
-	csvWriter := csv.NewWriter(csvFile)
-	for _, empRow := range csvData {
-		_ = csvWriter.Write(empRow)
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return err
 	}
-	csvWriter.Flush()
-	csvFile.Close()
+	fmt.Printf("wrote %d rows to %s\n", n, output)
+	return nil
 }
 
-// GetFileContent Reading file and return content of it
-func GetFileContent(filename string) string {
-	var result string
-	if strings.Contains(filename, "~") {
-		filename, _ = homedir.Expand(filename)
+func encodeBody(raw []byte, isResp bool) string {
+	b := body(raw, isResp)
+	if decode {
+		return string(b)
 	}
-	file, err := os.Open(filename)
-	if err != nil {
-		return result
-	}
-	defer file.Close()
-	b, err := ioutil.ReadAll(file)
-	if err != nil {
-		return result
-	}
-	return string(b)
+	return base64.StdEncoding.EncodeToString(b)
 }
 
-// WriteToFile write string to a file
-func WriteToFile(filename string, data string) (string, error) {
-	file, err := os.Create(filename)
-	if err != nil {
-		return "", err
+// body extracts the HTTP message body, undoing chunked and gzip encoding.
+// Malformed messages (common in pentest traffic) fall back to a header/body split.
+func body(raw []byte, isResp bool) []byte {
+	if len(raw) == 0 {
+		return nil
 	}
-	defer file.Close()
-
-	_, err = io.WriteString(file, data+"\n")
-	if err != nil {
-		return "", err
+	r := bufio.NewReader(bytes.NewReader(raw))
+	var b io.Reader
+	var h http.Header
+	if isResp {
+		resp, err := http.ReadResponse(r, nil)
+		if err != nil {
+			return splitBody(raw)
+		}
+		b, h = resp.Body, resp.Header
+	} else {
+		req, err := http.ReadRequest(r)
+		if err != nil {
+			return splitBody(raw)
+		}
+		b, h = req.Body, req.Header
 	}
-	return filename, file.Sync()
+	if h.Get("Content-Encoding") == "gzip" {
+		if gz, err := gzip.NewReader(b); err == nil {
+			b = gz
+		}
+	}
+	out, _ := io.ReadAll(b) // keep partial data on truncated messages
+	return out
 }
 
-// GetReqBody parse burp style request
-func GetReqBody(raw string) string {
-	var body string
-	if isBase64 {
-		raw, _ = Base64Decode(raw)
+func splitBody(raw []byte) []byte {
+	for _, sep := range []string{"\r\n\r\n", "\n\n"} {
+		if _, after, ok := bytes.Cut(raw, []byte(sep)); ok {
+			return after
+		}
 	}
-	reader := bufio.NewReader(strings.NewReader(raw))
-	parsedReq, err := http.ReadRequest(reader)
+	return nil
+}
+
+func printStats(src source) error {
+	method, status, mime, proto, host, url := map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}
+	var total, bytesTotal, withResp int
+	err := src(func(it Item) {
+		total++
+		method[it.Method]++
+		status[it.Status]++
+		mime[it.Mimetype]++
+		proto[it.Protocol]++
+		host[it.Host.Text]++
+		url[it.URL]++
+		n, _ := strconv.Atoi(it.Responselength)
+		bytesTotal += n
+		if it.Response.Text != "" {
+			withResp++
+		}
+	})
 	if err != nil {
-		return raw
+		return err
 	}
-	rBody, _ := ioutil.ReadAll(parsedReq.Body)
-	body = string(rBody)
-	if strings.Contains(body, ",") || strings.Contains(body, "\n") {
-		body = URLEncode(body)
-	}
-	body = Base64Encode(body)
-	return body
+	fmt.Printf("Requests:       %d\n", total)
+	fmt.Printf("With response:  %d\n", withResp)
+	fmt.Printf("Unique hosts:   %d\n", len(host))
+	fmt.Printf("Unique URLs:    %d\n", len(url))
+	fmt.Printf("Response bytes: %d\n", bytesTotal)
+	section("Methods", method, 0)
+	section("Status codes", status, 0)
+	section("Protocols", proto, 0)
+	section("MIME types", mime, 0)
+	section("Top hosts", host, top)
+	section("Top URLs", url, top)
+	return nil
 }
 
-// Base64Encode just Base64 Encode
-func Base64Encode(raw string) string {
-	return base64.StdEncoding.EncodeToString([]byte(raw))
-}
-
-// URLEncode just URL Encode
-func URLEncode(raw string) string {
-	return url.QueryEscape(raw)
-}
-
-// Base64Decode just Base64 Encode
-func Base64Decode(raw string) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(raw)
-	if err != nil {
-		return raw, err
+func section(title string, m map[string]int, limit int) {
+	type kv struct {
+		k string
+		n int
 	}
-	return string(data), nil
+	s := make([]kv, 0, len(m))
+	for k, n := range m {
+		if k == "" {
+			k = "(none)"
+		}
+		s = append(s, kv{k, n})
+	}
+	sort.Slice(s, func(i, j int) bool {
+		if s[i].n != s[j].n {
+			return s[i].n > s[j].n
+		}
+		return s[i].k < s[j].k
+	})
+	if limit > 0 && len(s) > limit {
+		s = s[:limit]
+	}
+	fmt.Printf("\n%s:\n", title)
+	for _, e := range s {
+		fmt.Printf("  %6d  %s\n", e.n, e.k)
+	}
 }
